@@ -8,6 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Currently configured for Chiliz Chain with PEPPER token. New chains/tokens are added via JSON config files with zero code changes.
 
+Distributed via Homebrew (`brew tap GrapeInTheTree/tap && brew install butler`), `go install`, and GitHub Releases.
+
 ## Development Commands
 
 ```bash
@@ -37,6 +39,10 @@ tail -f butler.log
 abigen --abi internal/infra/ethereum/abi/erc20.json \
        --pkg contracts --type ERC20 \
        --out internal/infra/ethereum/contracts/erc20.go
+
+# Release (tag triggers GoReleaser via GitHub Actions)
+git tag v0.3.0
+git push --tags
 ```
 
 ## CLI Commands
@@ -64,11 +70,19 @@ cmd/butler/
   cmd/
     root.go                         Cobra root command + global flags + PersistentPreRunE
                                     Resolves config, chain, and explorer client
+                                    appCtx struct holds shared state for all subcommands
+                                    slog silenced in CLI mode (TUI sets up file logger)
     tui.go                          TUI launcher (no-args fallback)
+                                    Logging to butler.log with 0600 permissions
     address.go                      `butler address <addr>` — parallel RPC + Explorer fetch
+                                    5 concurrent goroutines: balance, nonce, code, txlist, tokens
     tx.go                           `butler tx <hash>` — tx + receipt lookup
+                                    Derives sender via LatestSignerForChainID
+                                    Gets block timestamp for time display
     block.go                        `butler block [number]` — block by number
+                                    Supports "latest" keyword or specific block number
     chaininfo.go                    `butler chain-info` — chain status
+                                    Parallel: block number + gas price
 
 internal/
   domain/
@@ -78,14 +92,18 @@ internal/
     output.go                       CLI output types: AddressInfo, TxDetail, BlockInfo,
                                     ChainStatus, TokenBalance, TxSummary
                                     All JSON-serializable with stable field names
+                                    Numeric values that exceed JS Number.MAX_SAFE_INTEGER are strings
 
   infra/
     config/config.go                Loads chains.json, tokens.json, contacts.json, .env
                                     ResolveConfigDir() cascade: --config > env > ~/.butler/ > CWD
+                                    configPath() joins configDir + filename (empty configDir = relative)
                                     GetPrivateKey() reads key from env only at signing time
+                                    Wallets hardcoded: Main Wallet + Test Wallet
 
     ethereum/
-      client.go                     RPC queries: GetBalance, GetNonce, GetCode, GetChainID,
+      client.go                     RPC queries (each function creates/closes its own ethclient):
+                                    GetBalance, GetNonce, GetCode, GetChainID,
                                     GetGasPrice, GetLatestBlockNumber, GetTransaction,
                                     GetTransactionReceipt, GetBlock, SendTransaction (EIP-1559),
                                     FormatBalance, ParseAmount, GetAddressFromPrivateKey
@@ -98,18 +116,23 @@ internal/
     explorer/
       etherscan.go                  Chiliscan/Etherscan-compatible API client (Routescan)
                                     GetTxList, GetTokenBalances, GetTokenTxList
-                                    Rate-limited (2 req/sec), no API key needed
+                                    Rate-limited (2 req/sec via time.Tick), no API key needed
                                     Base URL per chain via Chain.ExplorerAPIURL
+                                    Graceful degradation: "No transactions found" is not an error
+                                    Internal types (rawTxListEntry) → domain types conversion
 
   output/
     formatter.go                    Print(jsonMode, v) — type switch for human/JSON output
-                                    Human: formatted tables to stdout
-                                    JSON: json.MarshalIndent to stdout
+                                    Human: fmt.Fprintf formatted tables to stdout
+                                    JSON: json.Encoder with indent to stdout
+                                    relativeTime() for "4d ago" style timestamps
+                                    shortenHash() for "0xabcd...ef12" display
 
   tui/
     app.go                          Router model: manages currentPage, holds shared data
                                     (wallets, chains, tokens, contacts), routes messages
                                     to active page sub-model
+                                    Init() loads config asynchronously via tea.Cmd
     style/style.go                  Shared Lipgloss styles (Title, Selected, Error, Success, etc.)
     pages/
       mainmenu/model.go             Menu: Send Transaction, Check Balance, Exit
@@ -134,6 +157,8 @@ internal/
 
 **Async blockchain calls:** RPC operations run as concurrent goroutines (CLI uses sync.WaitGroup, TUI uses Bubble Tea commands).
 
+**Package-level appContext:** CLI commands share resolved config/chain/explorer via a package-level struct in root.go. Appropriate for a CLI (single execution path, no concurrency at command level).
+
 ### Data Source Strategy
 
 | Data | Source | Notes |
@@ -143,7 +168,7 @@ internal/
 | Nonce, code, gas price | RPC | |
 | Tx by hash, receipt | RPC | |
 | Block by number | RPC | |
-| **Tx history by address** | **Explorer API** | RPC cannot do this |
+| **Tx history by address** | **Explorer API** | RPC cannot do this — no `eth_getTransactionsByAddress` exists |
 | **All token holdings** | **Explorer API** | Token discovery requires indexer |
 
 ### Config Path Resolution
@@ -181,6 +206,27 @@ internal/
 | Add output type | Add struct to `internal/domain/output.go`, add case in `internal/output/formatter.go` |
 | Add contract type | Place ABI in `abi/`, run `abigen`, use bindings in new `internal/infra/ethereum/<name>.go` |
 
+## Release Process
+
+Releases are automated via GoReleaser + GitHub Actions.
+
+```bash
+git tag v0.3.0
+git push --tags
+# GitHub Actions builds linux/darwin x amd64/arm64, creates GitHub Release,
+# and pushes Homebrew formula to GrapeInTheTree/homebrew-tap
+```
+
+**Config files:**
+- `.goreleaser.yml` — build matrix, archive format, Homebrew tap config
+- `.github/workflows/release.yml` — triggered on `v*` tag push
+- Secrets required: `HOMEBREW_TAP_TOKEN` (fine-grained PAT with repo scope on homebrew-tap)
+
+**Install methods after release:**
+- `brew tap GrapeInTheTree/tap && brew install butler`
+- `go install github.com/GrapeInTheTree/go-ethereum-butler/cmd/butler@latest`
+- Download binary from GitHub Releases page
+
 ## Key Dependencies
 
 - `cobra` v1.10.2 - CLI framework
@@ -192,6 +238,8 @@ internal/
 ## Security
 
 Private keys live only in `.env` (gitignored). They are loaded via `config.GetPrivateKey(envKey)` at the moment of transaction signing and never cached. The `.env.example` template shows the expected variable names. CLI read-only commands never access private keys.
+
+Git history has been audited: no secrets have ever been committed.
 
 ## Token Handling Notes
 
@@ -207,3 +255,4 @@ Private keys live only in `.env` (gitignored). They are loaded via `config.GetPr
 - Free tier: no API key, 2 req/sec, 10,000 calls/day
 - Etherscan-compatible format (module/action query params)
 - Set per chain via `explorer_api_url` in `chains.json`
+- Confirmed working endpoints: `txlist`, `addresstokenbalance`, `tokentx`, `balance`, `gasoracle`
