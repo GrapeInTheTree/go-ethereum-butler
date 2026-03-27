@@ -1,22 +1,21 @@
 # go-ethereum-butler
 
-A Terminal User Interface (TUI) application for managing multi-chain EVM transactions.
+A hybrid CLI+TUI application for managing multi-chain EVM transactions.
 
 ## Features
 
-- 🔗 Multi-chain support (currently: Chiliz Chain)
-- 💸 Send native currency (ETH, CHZ, etc.) and ERC-20 token transactions
-- 💰 Check wallet balances for both native and ERC-20 tokens
-- 💎 Custom ERC-20 token support with configurable decimals
-- 📖 Address book management
-- 🔐 Secure private key handling (environment variables)
-- ✨ Interactive keyboard-driven UI with token selection
+- **CLI mode** — scriptable blockchain queries with `--json` output (AI agent friendly)
+- **TUI mode** — interactive keyboard-driven interface
+- Multi-chain support (currently: Chiliz Chain)
+- Address info: balance, nonce, transaction history, token holdings
+- Transaction and block lookups
+- Send native currency (CHZ) and ERC-20 token transactions
+- Secure private key handling (environment variables)
+- Config-driven: add chains/tokens/contacts via JSON files
 
 ## Quick Start
 
 ### 1. Setup Configuration
-
-Create your `.env` file from the template:
 
 ```bash
 cp .env.example .env
@@ -29,9 +28,9 @@ BUTLER_WALLET_MAIN=your_private_key_here
 BUTLER_WALLET_TEST=your_test_private_key_here
 ```
 
-### 2. Configure Chains, Tokens, and Contacts
+### 2. Configure Chains
 
-**chains.json** - Add EVM-compatible chains:
+Create `chains.json`:
 ```json
 [
   {
@@ -39,12 +38,161 @@ BUTLER_WALLET_TEST=your_test_private_key_here
     "rpc_url": "https://rpc.ankr.com/chiliz",
     "chain_id": 88888,
     "currency_symbol": "CHZ",
-    "logo_url": "https://example.com/chz-logo.png"
+    "logo_url": "",
+    "explorer_api_url": "https://api.routescan.io/v2/network/mainnet/evm/88888/etherscan/api"
   }
 ]
 ```
 
-**tokens.json** - Add ERC-20 tokens (optional):
+Optionally configure `tokens.json` and `contacts.json` (see examples below).
+
+### 3. Build and Run
+
+```bash
+go build -o butler ./cmd/butler
+
+# TUI mode (interactive)
+./butler
+
+# CLI mode (scriptable)
+./butler address 0xC3B2A6D869868916b1f5D46f9b7C62eD2f1D2c49
+./butler tx 0x9f978b07484bb439e790079afe192e0a562a93a26c9d893ea8001ddda88e9981
+./butler block latest
+./butler chain-info
+```
+
+## CLI Usage
+
+```
+butler                              Interactive TUI mode
+butler address <addr>               Address info (balance, nonce, tx history, tokens)
+butler tx <hash>                    Transaction details with receipt
+butler block [number|latest]        Block information
+butler chain-info                   Chain status (latest block, gas price)
+
+Global flags:
+  --chain <name>     Blockchain network name (default: first in chains.json)
+  --json             Output in JSON format
+  --config <path>    Path to config directory
+  --help             Help for any command
+```
+
+### Examples
+
+```bash
+# Human-readable output
+$ butler address 0xC3B2A6D869868916b1f5D46f9b7C62eD2f1D2c49
+
+  Address:  0xC3B2A6D869868916b1f5D46f9b7C62eD2f1D2c49
+  Chain:    Chiliz Chain (88888)
+  Balance:  5045.818772 CHZ
+  Nonce:    310
+  Type:     EOA
+
+  Recent Transactions (last 10):
+    Hash            Method       Value              Time
+    -----------------------------------------------------------------
+    0x9f97...9981   Transfer     +3631.087415       4d ago
+    0x12a8...b3e5   Transfer     +316.752300        7d ago
+    ...
+
+# JSON output (for scripts and AI agents)
+$ butler address 0xC3B2...D2c49 --json
+{
+  "address": "0xC3B2A6D869868916b1f5D46f9b7C62eD2f1D2c49",
+  "chain": "Chiliz Chain",
+  "chain_id": 88888,
+  "native_balance": "5045.818772",
+  "native_symbol": "CHZ",
+  "nonce": 310,
+  "is_contract": false,
+  "recent_txs": [...]
+}
+
+# Pipe-friendly
+$ butler chain-info --json | jq .latest_block
+32617854
+```
+
+## TUI Usage
+
+Run `butler` without arguments for interactive mode.
+
+### Navigation
+
+- **Up/Down arrows** or **j/k** — Navigate menu items
+- **Enter** — Select/Confirm
+- **Esc** — Go back to main menu
+- **Ctrl+C** — Quit
+
+### Main Menu
+
+1. **Send Transaction** — Select wallet > chain > token > recipient > amount > confirm
+2. **Check Balance** — Select wallet > chain > token > view balance
+3. **Exit** — Quit the application
+
+## Architecture
+
+```
+go-ethereum-butler/
+├── cmd/butler/
+│   ├── main.go              # Entry point (Cobra Execute)
+│   └── cmd/                 # CLI commands
+│       ├── root.go          # Root command + global flags
+│       ├── tui.go           # TUI launcher (no-args fallback)
+│       ├── address.go       # butler address
+│       ├── tx.go            # butler tx
+│       ├── block.go         # butler block
+│       └── chaininfo.go     # butler chain-info
+├── internal/
+│   ├── domain/              # Pure data models + output types
+│   ├── infra/
+│   │   ├── config/          # Config loading + path resolution
+│   │   ├── ethereum/        # RPC client (go-ethereum)
+│   │   │   ├── abi/         # Raw ABI JSON files
+│   │   │   └── contracts/   # Generated Go bindings (abigen)
+│   │   └── explorer/        # Block explorer API client (Chiliscan)
+│   ├── output/              # Human/JSON output formatter
+│   └── tui/                 # Bubble Tea interactive UI
+│       ├── app.go           # Router
+│       ├── style/           # Shared styles
+│       └── pages/           # Page components
+├── chains.json              # Chain configs (gitignored)
+├── tokens.json              # Token configs (gitignored)
+├── contacts.json            # Address book (gitignored)
+└── .env                     # Private keys (gitignored)
+```
+
+### Design
+
+- **Clean Architecture**: domain (models) > infra (RPC, config, explorer) > presentation (CLI, TUI)
+- **Dual data sources**: RPC for real-time state, Explorer API for indexed data (tx history)
+- **Hybrid CLI+TUI**: Cobra routes commands; no args = Bubbletea TUI
+- **Config-driven**: chains/tokens/contacts as JSON, zero code changes to add new ones
+
+See `CLAUDE.md` for detailed developer documentation.
+
+## Configuration
+
+### chains.json
+
+```json
+[
+  {
+    "name": "Chiliz Chain",
+    "rpc_url": "https://rpc.ankr.com/chiliz",
+    "chain_id": 88888,
+    "currency_symbol": "CHZ",
+    "logo_url": "",
+    "explorer_api_url": "https://api.routescan.io/v2/network/mainnet/evm/88888/etherscan/api"
+  }
+]
+```
+
+The `explorer_api_url` enables transaction history and token discovery. Any Etherscan-compatible API works.
+
+### tokens.json
+
 ```json
 [
   {
@@ -58,7 +206,8 @@ BUTLER_WALLET_TEST=your_test_private_key_here
 ]
 ```
 
-**contacts.json** - Add your frequently used addresses:
+### contacts.json
+
 ```json
 [
   {
@@ -68,156 +217,33 @@ BUTLER_WALLET_TEST=your_test_private_key_here
 ]
 ```
 
-### 3. Build and Run
+### Config Directory
 
-```bash
-# Build
-go build -o butler ./cmd/butler
-
-# Run
-./butler
-```
-
-Or run directly:
-
-```bash
-go run ./cmd/butler
-```
-
-## Usage
-
-### Navigation
-
-- **Up/Down arrows** or **j/k** - Navigate menu items
-- **Enter** - Select/Confirm
-- **Esc** - Go back to main menu
-- **q** or **Ctrl+C** - Quit
-
-### Main Menu
-
-1. **Send Transaction** - Interactive flow to send native currency or ERC-20 tokens
-   - Select wallet → Select chain → Select token (Native/ERC-20) → Select recipient → Enter amount → Confirm
-2. **Check Balance** - View wallet balance for any token on any chain
-   - Select wallet → Select chain → Select token (Native/ERC-20) → View balance
-3. **Exit** - Quit the application
-
-## Architecture
- 
-The project follows **Standard Go Project Layout** and **Clean Architecture** principles.
- 
-```
-go-ethereum-butler/
-├── cmd/butler/          # Application entry point
-├── internal/
-│   ├── domain/          # Pure business logic (Models)
-│   ├── infra/           # Infrastructure (Ethereum, Config)
-│   │   ├── config/      # Configuration loading
-│   │   └── ethereum/    # Blockchain client & contracts
-│   │       ├── abi/     # Raw ABI JSON files
-│   │       └── contracts/ # Generated Go bindings (abigen)
-│   └── tui/             # Terminal User Interface
-│       ├── app.go       # Main Router (Bubble Tea)
-│       ├── style/       # Shared styles
-│       └── pages/       # Independent page components
-│           ├── mainmenu/
-│           ├── balance/
-│           └── send/
-├── chains.json          # Chain configurations
-├── tokens.json          # ERC-20 token configurations
-├── contacts.json        # Address book
-└── .env                 # Private keys (DO NOT COMMIT)
-```
- 
-### Design Patterns
- 
-#### Clean Architecture
-- **Domain Layer** (`internal/domain`): Contains pure data structures (`Chain`, `Token`, `Wallet`) with no external dependencies.
-- **Infrastructure Layer** (`internal/infra`): Handles external concerns like file I/O and blockchain RPC calls.
-- **Presentation Layer** (`internal/tui`): Handles UI rendering and user input, depending only on Domain and Infrastructure.
- 
-#### Nested Models (Bubble Tea)
-Instead of a single monolithic model, the UI is broken down into smaller, composable models:
-- **`app.go`**: The parent model that acts as a router. It switches between different page models based on user navigation.
-- **Pages**: Each screen (Menu, Balance, Send) is a self-contained Bubble Tea model with its own `Init`, `Update`, and `View`.
- 
-This makes the codebase highly scalable. To add a new feature, you simply create a new package in `internal/tui/pages/` and register it in `app.go`.
-
-See `CLAUDE.md` for detailed developer documentation.
+Butler looks for config files in this order:
+1. `--config /path/to/dir` flag
+2. `BUTLER_CONFIG_DIR` environment variable
+3. `~/.butler/` (if `chains.json` exists there)
+4. Current working directory
 
 ## Security
 
-- Private keys are **never** stored in code or configuration files
+- Private keys are **never** stored in code or config files
 - Keys are only loaded from environment variables at signing time
-- `.env` is automatically excluded from git via `.gitignore`
-- Always keep your `.env` file secure and never share it
+- `.env` is excluded from git via `.gitignore`
+- CLI read-only commands (`address`, `tx`, `block`, `chain-info`) never access private keys
 
-## Adding New Chains
+## Dependencies
 
-Simply add a new entry to `chains.json`:
-
-```json
-{
-  "name": "Your Chain Name",
-  "rpc_url": "https://rpc.yourchain.com",
-  "chain_id": 12345,
-  "currency_symbol": "TOKEN",
-  "logo_url": "https://example.com/token-logo.png"
-}
-```
-
-The TUI will automatically detect and display the new chain. The `logo_url` is used for the native token icon (optional).
-
-## Adding New Tokens
-
-Add ERC-20 tokens to `tokens.json`:
-
-```json
-{
-  "symbol": "USDC",
-  "name": "USD Coin",
-  "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
-  "decimals": 6,
-  "chain_id": 1,
-  "logo_url": ""
-}
-```
-
-**Key points:**
-- `decimals`: Token decimal places (18 for most tokens, 6 for USDC/USDT)
-- `chain_id`: Must match a chain in `chains.json`
-- `logo_url`: Optional URL for token icon/logo
-- Same token on different chains needs separate entries
-- Native tokens (ETH, CHZ, etc.) are automatically available and use the chain's `logo_url`
+- [Cobra](https://github.com/spf13/cobra) — CLI framework
+- [Bubbletea](https://github.com/charmbracelet/bubbletea) — TUI framework
+- [Lipgloss](https://github.com/charmbracelet/lipgloss) — TUI styling
+- [go-ethereum](https://github.com/ethereum/go-ethereum) — Ethereum client
+- [godotenv](https://github.com/joho/godotenv) — Environment variable management
 
 ## Requirements
 
 - Go 1.25.1 or higher
 - Access to EVM-compatible RPC endpoints
-
-## Development Setup
- 
-### Installing Abigen
- 
-To work with smart contracts, you need the `abigen` tool installed:
- 
-```bash
-go install github.com/ethereum/go-ethereum/cmd/abigen@latest
-```
- 
-### Generating Bindings
- 
-If you update the ABI files in `internal/infra/ethereum/abi/`, regenerate the Go bindings:
- 
-```bash
-abigen --abi internal/infra/ethereum/abi/erc20.json --pkg contracts --type ERC20 --out internal/infra/ethereum/contracts/erc20.go
-```
- 
-## Dependencies
-
-- [Bubbletea](https://github.com/charmbracelet/bubbletea) - TUI framework
-- [Lipgloss](https://github.com/charmbracelet/lipgloss) - TUI styling
-- [go-ethereum](https://github.com/ethereum/go-ethereum) - Ethereum client
-- [godotenv](https://github.com/joho/godotenv) - Environment variable management
 
 ## License
 
