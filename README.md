@@ -1,6 +1,26 @@
-# go-ethereum-butler
+<p align="center">
+  <h1 align="center">go-ethereum-butler</h1>
+  <p align="center">
+    <strong>Your personal EVM blockchain assistant, from the terminal.</strong>
+  </p>
+  <p align="center">
+    A hybrid CLI+TUI tool built with Go for querying and managing multi-chain EVM transactions — optimized for Chiliz Chain, extensible to any EVM network.
+  </p>
+</p>
 
-A hybrid CLI+TUI application for managing multi-chain EVM transactions. Built with Go, optimized for Chiliz Chain.
+---
+
+## Why go-ethereum-butler?
+
+Most EVM CLI tools are either too low-level (raw RPC calls) or too generic (Foundry's `cast` has no concept of saved chains, contacts, or token configs). Butler fills the gap:
+
+- **Stateful** — remembers your chains, tokens, and contacts across sessions via JSON config
+- **Dual Data Sources** — combines RPC (real-time balance, blocks) with Explorer API (transaction history, token discovery) in a single command
+- **AI Agent Friendly** — `--json` output on every command, designed for `butler address 0x... --json | jq`
+- **Chiliz-First** — built for a chain with no dedicated CLI tooling (Chiliz is a go-ethereum fork)
+- **Hybrid** — same binary runs as a scriptable CLI or an interactive TUI
+
+Think of it as `cast` meets a personal wallet manager.
 
 ## Install
 
@@ -19,7 +39,7 @@ go install github.com/GrapeInTheTree/go-ethereum-butler/cmd/butler@latest
 
 ### Download Binary
 
-Pre-built binaries for macOS (Intel/Apple Silicon) and Linux (amd64/arm64) are available on the [Releases](https://github.com/GrapeInTheTree/go-ethereum-butler/releases) page.
+Pre-built binaries for macOS (Intel/Apple Silicon) and Linux (amd64/arm64) on the [Releases](https://github.com/GrapeInTheTree/go-ethereum-butler/releases) page.
 
 ### Build From Source
 
@@ -29,14 +49,33 @@ cd go-ethereum-butler
 go build -o butler ./cmd/butler
 ```
 
-## Features
+## How It Works
 
-- **CLI mode** — scriptable blockchain queries with `--json` output for AI agents and scripts
-- **TUI mode** — interactive keyboard-driven interface for balance checks and token transfers
-- **Dual data sources** — RPC for real-time chain state + Chiliscan API for transaction history
-- **Multi-chain ready** — add any EVM chain via JSON config (currently: Chiliz Chain)
-- **Config-driven** — chains, tokens, and contacts as JSON files, zero code changes to extend
-- **Secure** — private keys only in `.env`, loaded on-demand at signing time, never cached
+```
+butler address 0xC3B2...D2c49
+    │
+    ├── RPC (go-ethereum ethclient) ──────────────────> Chiliz Node
+    │     ├── eth_getBalance         → native balance     (rpc.ankr.com/chiliz)
+    │     ├── eth_getTransactionCount → nonce
+    │     └── eth_getCode            → EOA or contract
+    │
+    └── Explorer API (Chiliscan/Routescan) ───────────> Indexer
+          ├── txlist                  → recent transactions
+          └── addresstokenbalance    → all ERC-20 holdings
+
+    ──> output.Print(jsonMode, AddressInfo)
+          ├── human-readable table (default)
+          └── JSON (--json flag)
+```
+
+| Data | Source | Why |
+|------|--------|-----|
+| Native balance, nonce, code | RPC `eth_*` | Standard EVM methods |
+| Tx by hash + receipt | RPC | Direct lookup |
+| Block by number | RPC | Direct lookup |
+| Gas price, chain ID | RPC | Real-time state |
+| **Tx history by address** | **Explorer API** | No RPC method exists (`eth_getTransactionsByAddress` doesn't exist) |
+| **All token holdings** | **Explorer API** | Token discovery requires an indexer |
 
 ## CLI Usage
 
@@ -54,10 +93,11 @@ Global flags:
   -h, --help         Help for any command
 ```
 
-### Examples
+### butler address
+
+Comprehensive address overview — 5 concurrent fetches (3 RPC + 2 Explorer) for fast response.
 
 ```bash
-# Address overview with balance, nonce, and recent transactions
 $ butler address 0xC3B2A6D869868916b1f5D46f9b7C62eD2f1D2c49
 
   Address:  0xC3B2A6D869868916b1f5D46f9b7C62eD2f1D2c49
@@ -74,23 +114,15 @@ $ butler address 0xC3B2A6D869868916b1f5D46f9b7C62eD2f1D2c49
     -----------------------------------------------------------------
     0x9f97...9981   Transfer     +3631.087415       4d ago
     0x12a8...b3e5   Transfer     +316.752300        7d ago
+    0x1a79...a414   Transfer     -316.752300        7d ago
     ...
+```
 
-# JSON output for scripts and AI agents
-$ butler address 0xC3B2A6D869868916b1f5D46f9b7C62eD2f1D2c49 --json
-{
-  "address": "0xC3B2A6D869868916b1f5D46f9b7C62eD2f1D2c49",
-  "chain": "Chiliz Chain",
-  "chain_id": 88888,
-  "native_balance": "5045.818772",
-  "native_symbol": "CHZ",
-  "nonce": 310,
-  "is_contract": false,
-  "token_balances": [...],
-  "recent_txs": [...]
-}
+### butler tx
 
-# Transaction details
+Full transaction details including receipt, gas breakdown, and event logs.
+
+```bash
 $ butler tx 0x9f978b07484bb439e790079afe192e0a562a93a26c9d893ea8001ddda88e9981
 
   Tx Hash:    0x9f978b...88e9981
@@ -105,8 +137,11 @@ $ butler tx 0x9f978b07484bb439e790079afe192e0a562a93a26c9d893ea8001ddda88e9981
   Tx Fee:     0.105021 CHZ
   Nonce:      5343
   Logs:       0 events
+```
 
-# Block info
+### butler block
+
+```bash
 $ butler block latest
 
   Block:       #32617854
@@ -116,17 +151,50 @@ $ butler block latest
   Gas Used:    70012 / 30000000
   Base Fee:    2500.00 Gwei
   Txs:         1 transactions
+```
 
-# Chain status
-$ butler chain-info --json | jq .latest_block
-32617854
+### butler chain-info
+
+```bash
+$ butler chain-info --json
+{
+  "name": "Chiliz Chain",
+  "chain_id": 88888,
+  "rpc_url": "https://rpc.ankr.com/chiliz",
+  "latest_block": 32617854,
+  "gas_price": "2501.00 Gwei",
+  "currency_symbol": "CHZ"
+}
+```
+
+### JSON Output
+
+Every command supports `--json` for piping and AI agent consumption:
+
+```bash
+butler address 0xC3B2... --json | jq .native_balance
+butler chain-info --json | jq .latest_block
+butler tx 0x9f97... --json | jq '{status, fee: .tx_fee}'
 ```
 
 ## TUI Usage
 
 Run `butler` with no arguments for interactive mode.
 
-### Navigation
+```
+┌─────────────────────────────────────┐
+│  🔗  GO-ETHEREUM-BUTLER  🔗        │
+│  Multi-Chain EVM Transaction Manager│
+│                                     │
+│  ┌─────────────────────────────┐    │
+│  │  Main Menu                  │    │
+│  │                             │    │
+│  │  📤 Send Transaction        │    │
+│  │  💰 Check Balance      ◄   │    │
+│  │  🚪 Exit                   │    │
+│  └─────────────────────────────┘    │
+└─────────────────────────────────────┘
+```
 
 | Key | Action |
 |-----|--------|
@@ -138,14 +206,13 @@ Run `butler` with no arguments for interactive mode.
 | `0-9`, `.` | Amount input (send flow) |
 | `backspace` | Delete last character |
 
-### Flows
+**Check Balance** — Select wallet > chain > token (native or ERC-20) > view balance
 
-- **Check Balance** — Select wallet > chain > token (native or ERC-20) > view balance
-- **Send Transaction** — Select wallet > chain > token > recipient > enter amount > confirm > tx hash
+**Send Transaction** — Select wallet > chain > token > recipient > enter amount > confirm > tx hash
 
 ## Configuration
 
-Butler uses JSON config files. All are gitignored by default — create your own.
+Butler uses JSON config files. All are gitignored by default — create your own from the examples below.
 
 ### chains.json
 
@@ -162,9 +229,14 @@ Butler uses JSON config files. All are gitignored by default — create your own
 ]
 ```
 
-- `rpc_url` — any EVM-compatible JSON-RPC endpoint
-- `explorer_api_url` — Etherscan-compatible API (enables tx history and token discovery). Optional; if omitted, CLI commands still show RPC-based data (balance, nonce, blocks)
-- Add multiple chains to the array for multi-chain support; select with `--chain <name>`
+| Field | Required | Description |
+|-------|:--------:|-------------|
+| `name` | Yes | Display name, also used with `--chain` flag |
+| `rpc_url` | Yes | Any EVM-compatible JSON-RPC endpoint |
+| `chain_id` | Yes | EIP-155 chain ID |
+| `currency_symbol` | Yes | Native token symbol (CHZ, ETH, etc.) |
+| `logo_url` | No | Optional logo URL |
+| `explorer_api_url` | No | Etherscan-compatible API URL. Enables tx history and token discovery. Without it, CLI still shows RPC-based data. |
 
 ### tokens.json
 
@@ -190,10 +262,8 @@ Butler uses JSON config files. All are gitignored by default — create your own
 
 ```json
 [
-  {
-    "name": "My Friend",
-    "address": "0x..."
-  }
+  { "name": "My Friend", "address": "0x..." },
+  { "name": "Team Wallet", "address": "0x..." }
 ]
 ```
 
@@ -206,9 +276,10 @@ BUTLER_WALLET_MAIN=your_private_key_here_without_0x_prefix
 BUTLER_WALLET_TEST=your_test_private_key_here
 ```
 
-Copy from `.env.example`. Private keys are **never** logged, cached, or included in git. CLI read-only commands (`address`, `tx`, `block`, `chain-info`) do not access private keys.
+Copy from `.env.example`. Private keys are **never** logged, cached, or committed to git. CLI read-only commands (`address`, `tx`, `block`, `chain-info`) do not access private keys at all.
 
-### Config Directory Resolution
+<details>
+<summary>Config Directory Resolution</summary>
 
 Butler searches for config files in this order:
 
@@ -217,72 +288,63 @@ Butler searches for config files in this order:
 3. `~/.butler/` directory (if `chains.json` exists there)
 4. Current working directory (default)
 
+This allows installing butler globally via `brew` and keeping configs in `~/.butler/`.
+
+</details>
+
 ## Architecture
 
 ```
-go-ethereum-butler/
-├── cmd/butler/
-│   ├── main.go                  # Entry point: Cobra Execute()
-│   └── cmd/
-│       ├── root.go              # Root command, global flags, PersistentPreRunE
-│       ├── tui.go               # TUI launcher (no-args fallback)
-│       ├── address.go           # butler address — parallel RPC + Explorer
-│       ├── tx.go                # butler tx — tx + receipt lookup
-│       ├── block.go             # butler block — block by number
-│       └── chaininfo.go         # butler chain-info — chain status
-│
-├── internal/
-│   ├── domain/
-│   │   ├── models.go            # Chain, Token, Wallet, Contact structs
-│   │   └── output.go            # AddressInfo, TxDetail, BlockInfo, ChainStatus
-│   │
-│   ├── infra/
-│   │   ├── config/config.go     # JSON/env config loading + path resolution
-│   │   ├── ethereum/
-│   │   │   ├── client.go        # RPC: balance, nonce, code, blocks, tx, gas
-│   │   │   ├── erc20.go         # ERC-20: balance, transfer, formatting
-│   │   │   ├── abi/erc20.json   # Standard ERC-20 ABI
-│   │   │   └── contracts/       # Auto-generated Go bindings (abigen)
-│   │   └── explorer/
-│   │       └── etherscan.go     # Chiliscan API: tx history, token discovery
-│   │
-│   ├── output/
-│   │   └── formatter.go         # Human-readable + JSON dual formatter
-│   │
-│   └── tui/
-│       ├── app.go               # Bubble Tea router
-│       ├── style/style.go       # Lipgloss styles
-│       └── pages/               # mainmenu, balance, send
-│
-├── .goreleaser.yml              # Cross-compile + Homebrew formula generation
-├── .github/workflows/
-│   └── release.yml              # Tag-triggered GoReleaser CI
-│
-├── chains.json                  # Chain configs (gitignored, user-created)
-├── tokens.json                  # Token configs (gitignored, user-created)
-├── contacts.json                # Address book (gitignored, user-created)
-└── .env                         # Private keys (gitignored, user-created)
+cmd/butler/
+  main.go                       Entry point: Cobra Execute()
+  cmd/
+    root.go                     Root command + global flags + PersistentPreRunE
+    tui.go                      TUI launcher (no-args fallback)
+    address.go                  butler address — parallel RPC + Explorer
+    tx.go                       butler tx — tx + receipt lookup
+    block.go                    butler block — block by number
+    chaininfo.go                butler chain-info — chain status
+
+internal/
+  domain/
+    models.go                   Chain, Token, Wallet, Contact structs
+    output.go                   AddressInfo, TxDetail, BlockInfo, ChainStatus
+
+  infra/
+    config/config.go            JSON/env config loading + path resolution
+    ethereum/
+      client.go                 RPC: balance, nonce, code, blocks, tx, gas
+      erc20.go                  ERC-20: balance, transfer, formatting
+      abi/erc20.json            Standard ERC-20 ABI
+      contracts/erc20.go        Auto-generated Go bindings (abigen)
+    explorer/
+      etherscan.go              Chiliscan API: tx history, token discovery
+
+  output/
+    formatter.go                Human + JSON dual formatter
+
+  tui/
+    app.go                      Bubble Tea router
+    style/style.go              Lipgloss styles
+    pages/                      mainmenu, balance, send
 ```
 
-### Design Principles
+<details>
+<summary>Design Decisions</summary>
 
-- **Clean Architecture** — domain (pure models) > infra (RPC, config, explorer) > presentation (CLI, TUI)
-- **Hybrid CLI+TUI** — Cobra routes subcommands; no args = Bubbletea TUI. Single binary.
-- **Dual Data Sources** — RPC for real-time chain state (balance, blocks, tx by hash). Explorer API for indexed data (tx history by address, token discovery). Explorer is optional with graceful degradation.
-- **Config-Driven** — chains, tokens, contacts as JSON files. Zero code changes to add new chains or tokens.
-- **Concurrent RPC Calls** — `butler address` fires 5 parallel requests (3 RPC + 2 Explorer) for fast response.
+**Cobra + Bubbletea hybrid** — Cobra routes subcommands. No args = Bubbletea TUI. Single binary, same infra layer shared. This follows the pattern used by `lazygit`, `k9s`, and other Go CLI/TUI hybrids.
 
-### Data Source Strategy
+**Package-level appContext** — CLI commands share resolved config/chain/explorer via a package-level struct in `root.go`. Appropriate for a CLI tool (single execution path, no concurrency at the command level). Not suitable for a server; would need DI then.
 
-| Data | Source | Why |
-|------|--------|-----|
-| Native balance | RPC `eth_getBalance` | Standard RPC method |
-| ERC-20 balance | RPC `eth_call` (balanceOf) | Direct contract call |
-| Nonce, code, gas price | RPC | Standard RPC methods |
-| Tx by hash + receipt | RPC | Standard RPC methods |
-| Block by number | RPC | Standard RPC method |
-| **Tx history by address** | **Explorer API** | No RPC method exists for this |
-| **All token holdings** | **Explorer API** | Token discovery requires indexer |
+**Each RPC function creates its own ethclient** — `Dial → defer Close → call → return`. For a CLI that runs one command and exits, connection pool overhead isn't worth the lifecycle management complexity.
+
+**Explorer graceful degradation** — If a chain has no `explorer_api_url` or the API is down, `butler address` still shows balance, nonce, and contract status from RPC. Explorer sections are simply omitted.
+
+**Output types in `domain/`** — `AddressInfo`, `TxDetail`, etc. are stable JSON contracts. Placing them in `domain/` keeps them framework-agnostic and reusable across CLI, TUI, and future API layers.
+
+**pow10 uses big.Int** — The original `int64`-based `pow10()` would silently overflow for tokens with >18 decimals. Fixed to use `big.Int.Exp()` which is safe for any decimal count.
+
+</details>
 
 ## Releasing
 
@@ -297,29 +359,97 @@ git tag v0.3.0
 git push && git push --tags
 
 # 3. GitHub Actions automatically:
-#    - Cross-compiles linux/darwin x amd64/arm64
+#    - Cross-compiles linux/darwin × amd64/arm64
 #    - Creates GitHub Release with changelog and binaries
 #    - Updates Homebrew formula in GrapeInTheTree/homebrew-tap
 ```
 
 Users upgrade with `brew upgrade butler` or `go install ...@latest`.
 
-## Dependencies
+<details>
+<summary>Release Infrastructure Details</summary>
 
-| Package | Version | Purpose |
-|---------|---------|---------|
-| [spf13/cobra](https://github.com/spf13/cobra) | v1.10.2 | CLI framework |
-| [charmbracelet/bubbletea](https://github.com/charmbracelet/bubbletea) | v1.3.10 | TUI framework |
-| [charmbracelet/lipgloss](https://github.com/charmbracelet/lipgloss) | v1.1.0 | TUI styling |
-| [ethereum/go-ethereum](https://github.com/ethereum/go-ethereum) | v1.16.7 | Ethereum RPC client, tx signing, ABI bindings |
-| [joho/godotenv](https://github.com/joho/godotenv) | v1.5.1 | .env file loader |
+| File | Purpose |
+|------|---------|
+| `.goreleaser.yml` | Build matrix (linux/darwin × amd64/arm64), archive format, Homebrew tap config |
+| `.github/workflows/release.yml` | Triggered on `v*` tag push, runs `goreleaser release --clean` |
 
-## Requirements
+**Required GitHub secrets:**
+- `HOMEBREW_TAP_TOKEN` — Fine-grained PAT with `repo` scope on `GrapeInTheTree/homebrew-tap`
+- `GITHUB_TOKEN` — Automatic, used for creating GitHub Releases
 
-- Go 1.25.1+ (build from source / go install)
-- Access to EVM-compatible RPC endpoints
-- Chiliscan API access for tx history (free, no API key)
+</details>
+
+## Development
+
+```bash
+go build -o butler ./cmd/butler    # Build
+go test ./...                       # Test
+go vet ./...                        # Lint
+tail -f butler.log                  # TUI logs
+```
+
+<details>
+<summary>Regenerate ERC-20 Bindings</summary>
+
+If you update `internal/infra/ethereum/abi/erc20.json`:
+
+```bash
+go install github.com/ethereum/go-ethereum/cmd/abigen@latest
+abigen --abi internal/infra/ethereum/abi/erc20.json \
+       --pkg contracts --type ERC20 \
+       --out internal/infra/ethereum/contracts/erc20.go
+```
+
+</details>
+
+<details>
+<summary>Extending the App</summary>
+
+**No code changes needed:**
+
+| What | File |
+|------|------|
+| Add EVM chain | `chains.json` (include `explorer_api_url` for tx history) |
+| Add ERC-20 token | `tokens.json` (decimals must match contract) |
+| Add contact | `contacts.json` |
+
+**Code changes needed:**
+
+| What | Where |
+|------|-------|
+| Add CLI command | Create `cmd/butler/cmd/<name>.go`, register in `root.go` `init()` |
+| Add wallet | `internal/infra/config/config.go` `LoadWallets()` + `.env` |
+| Add TUI page | Create `internal/tui/pages/<name>/model.go`, register in `app.go` |
+| Add blockchain query | Add to `internal/infra/ethereum/client.go` |
+| Add explorer query | Add to `internal/infra/explorer/etherscan.go` |
+| Add output type | Add struct to `internal/domain/output.go`, add case in `internal/output/formatter.go` |
+| Add contract type | Place ABI in `abi/`, run `abigen`, use bindings in new file |
+
+</details>
+
+## Technology Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Language | Go 1.25+ |
+| CLI Framework | [spf13/cobra](https://github.com/spf13/cobra) v1.10.2 |
+| TUI Framework | [charmbracelet/bubbletea](https://github.com/charmbracelet/bubbletea) v1.3.10 |
+| TUI Styling | [charmbracelet/lipgloss](https://github.com/charmbracelet/lipgloss) v1.1.0 |
+| EVM Client | [ethereum/go-ethereum](https://github.com/ethereum/go-ethereum) v1.16.7 |
+| Env Loader | [joho/godotenv](https://github.com/joho/godotenv) v1.5.1 |
+| Release | [GoReleaser](https://goreleaser.com/) + GitHub Actions |
+| Explorer API | [Chiliscan](https://chiliscan.com/) (Routescan, Etherscan-compatible) |
+
+## Security
+
+- Private keys live only in `.env` (gitignored) and are loaded on-demand at signing time via `config.GetPrivateKey()`
+- Keys are never cached in memory, logged, or written to any file
+- CLI read-only commands never access private keys
+- Git history audited: no secrets have ever been committed
+- Log file permissions set to `0600` (owner read/write only)
+- `.env`, `chains.json`, `tokens.json`, `contacts.json` are all gitignored
 
 ## License
 
-MIT
+[MIT](LICENSE)
