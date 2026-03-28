@@ -36,6 +36,11 @@ var rootCmd = &cobra.Command{
 		// In CLI mode, silence slog output (TUI sets up its own file logger)
 		slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
 
+		// Skip config loading for init and version commands
+		if cmd.Name() == "init" || cmd.Name() == "version" {
+			return nil
+		}
+
 		// Resolve config directory
 		config.ResolveConfigDir(configFlag)
 
@@ -92,6 +97,7 @@ func init() {
 	rootCmd.AddCommand(rpcCmd)
 	rootCmd.AddCommand(stakingCmd)
 	rootCmd.AddCommand(tokenCmd)
+	rootCmd.AddCommand(initCmd)
 }
 
 // Execute runs the root command
