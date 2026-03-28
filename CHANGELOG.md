@@ -61,6 +61,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 - **Validators "unknown" status** — semaphore (max 4 concurrent) + retry to avoid RPC rate limiting. All 13 validators now show consistently.
+- **EIP-1559 gas price/fee accuracy** — `chiliz tx` now uses `receipt.EffectiveGasPrice` instead of `tx.GasPrice()` (which returns maxFeePerGas). Gas Price and Tx Fee now match Chiliscan exactly.
+
+### Changed
+- **Project rebranded** from `go-ethereum-butler` to `chiliz-cli`. Binary `butler` → `chiliz`. Config `~/.butler/` → `~/.chiliz/`. Env vars `BUTLER_*` → `CHILIZ_*`.
+- **`chiliz tx` shows internal transactions** — queries Chiliscan `txlistinternal` by tx hash. Displays From/To/Value/Gas table for contract calls with internal CALL operations.
 
 ## [0.2.0] - 2026-03-27
 
