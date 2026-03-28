@@ -112,6 +112,12 @@ var txCmd = &cobra.Command{
 			}
 		}
 
+		// Resolve method name via 4byte lookup
+		methodName := ""
+		if methodID != "" {
+			methodName = ethereum.ResolveMethodName(methodID)
+		}
+
 		detail := domain.TxDetail{
 			Hash:           hash,
 			Status:         status,
@@ -129,6 +135,7 @@ var txCmd = &cobra.Command{
 			Nonce:          tx.Nonce(),
 			InputData:      inputData,
 			MethodID:       methodID,
+			MethodName:     methodName,
 			LogCount:       logCount,
 		}
 

@@ -110,7 +110,9 @@ func printTxHuman(t domain.TxDetail) {
 	fmt.Printf("  Gas Used:   %d / %d\n", t.GasUsed, t.GasLimit)
 	fmt.Printf("  Tx Fee:     %s\n", t.TxFee)
 	fmt.Printf("  Nonce:      %d\n", t.Nonce)
-	if t.MethodID != "" {
+	if t.MethodName != "" {
+		fmt.Printf("  Method:     %s\n", t.MethodName)
+	} else if t.MethodID != "" {
 		fmt.Printf("  Method ID:  %s\n", t.MethodID)
 	}
 	fmt.Printf("  Logs:       %d events\n", t.LogCount)
