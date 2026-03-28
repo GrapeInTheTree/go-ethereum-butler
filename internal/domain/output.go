@@ -11,6 +11,7 @@ type AddressInfo struct {
 	IsContract    bool           `json:"is_contract"`
 	TokenBalances []TokenBalance `json:"token_balances,omitempty"`
 	RecentTxs     []TxSummary    `json:"recent_txs,omitempty"`
+	InternalTxs   []TxSummary    `json:"internal_txs,omitempty"`
 }
 
 // TokenBalance represents a single token holding
@@ -101,6 +102,53 @@ type ValidatorsResult struct {
 	ChainID    int64           `json:"chain_id"`
 	Count      int             `json:"count"`
 	Validators []ValidatorInfo `json:"validators"`
+}
+
+// ContractInfo is the response for `butler contract <address>`
+type ContractInfo struct {
+	Address        string `json:"address"`
+	Name           string `json:"name"`
+	Compiler       string `json:"compiler,omitempty"`
+	EVMVersion     string `json:"evm_version,omitempty"`
+	Optimized      bool   `json:"optimized"`
+	Runs           string `json:"runs,omitempty"`
+	License        string `json:"license,omitempty"`
+	IsProxy        bool   `json:"is_proxy"`
+	Implementation string `json:"implementation,omitempty"`
+	Verified       bool   `json:"verified"`
+	Deployer       string `json:"deployer,omitempty"`
+	DeployTx       string `json:"deploy_tx,omitempty"`
+}
+
+// HolderEntry represents a single token holder
+type HolderEntry struct {
+	Address string `json:"address"`
+	Balance string `json:"balance"`
+}
+
+// HoldersResult is the response for `butler holders <token>`
+type HoldersResult struct {
+	Token      string        `json:"token"`
+	TotalCount string        `json:"total_count"`
+	Holders    []HolderEntry `json:"holders"`
+}
+
+// LogEntry represents a single event log
+type LogEntry struct {
+	Address     string   `json:"address"`
+	BlockNumber uint64   `json:"block_number"`
+	TxHash      string   `json:"tx_hash"`
+	Topics      []string `json:"topics"`
+	Data        string   `json:"data"`
+	EventName   string   `json:"event_name,omitempty"`
+}
+
+// LogsResult is the response for `butler logs`
+type LogsResult struct {
+	Address string     `json:"address"`
+	Event   string     `json:"event,omitempty"`
+	Count   int        `json:"count"`
+	Logs    []LogEntry `json:"logs"`
 }
 
 // TokenDetail is the response for `butler token <address>`

@@ -90,7 +90,7 @@ var addressCmd = &cobra.Command{
 		// Explorer data (graceful degradation)
 		if appCtx.Explorer != nil {
 			var explWg sync.WaitGroup
-			explWg.Add(2)
+			explWg.Add(3)
 
 			go func() {
 				defer explWg.Done()
@@ -108,6 +108,16 @@ var addressCmd = &cobra.Command{
 				if err == nil {
 					mu.Lock()
 					info.TokenBalances = tokens
+					mu.Unlock()
+				}
+			}()
+
+			go func() {
+				defer explWg.Done()
+				itxs, err := appCtx.Explorer.GetInternalTxList(addr, 1, 5)
+				if err == nil {
+					mu.Lock()
+					info.InternalTxs = itxs
 					mu.Unlock()
 				}
 			}()

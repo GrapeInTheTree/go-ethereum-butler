@@ -265,6 +265,38 @@ func GetBlock(rpcURL string, number *big.Int) (*types.Block, error) {
 	return block, nil
 }
 
+// FilterLogs queries event logs from the chain via eth_getLogs
+func FilterLogs(rpcURL string, address string, topics []common.Hash, fromBlock, toBlock *big.Int) ([]types.Log, error) {
+	client, err := ethclient.Dial(rpcURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to RPC: %w", err)
+	}
+	defer client.Close()
+
+	addresses := []common.Address{}
+	if address != "" {
+		addresses = append(addresses, common.HexToAddress(address))
+	}
+
+	topicFilter := [][]common.Hash{}
+	if len(topics) > 0 {
+		topicFilter = append(topicFilter, topics)
+	}
+
+	query := goethereum.FilterQuery{
+		FromBlock: fromBlock,
+		ToBlock:   toBlock,
+		Addresses: addresses,
+		Topics:    topicFilter,
+	}
+
+	logs, err := client.FilterLogs(context.Background(), query)
+	if err != nil {
+		return nil, fmt.Errorf("eth_getLogs failed: %w", err)
+	}
+	return logs, nil
+}
+
 // CallContract executes a read-only eth_call against a contract
 func CallContract(rpcURL, contractAddr string, calldata []byte) ([]byte, error) {
 	client, err := ethclient.Dial(rpcURL)

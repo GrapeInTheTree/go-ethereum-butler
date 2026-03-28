@@ -42,6 +42,12 @@ func printHuman(v any) error {
 		printStakingHuman(data)
 	case domain.TokenDetail:
 		printTokenHuman(data)
+	case domain.ContractInfo:
+		printContractHuman(data)
+	case domain.HoldersResult:
+		printHoldersHuman(data)
+	case domain.LogsResult:
+		printLogsHuman(data)
 	default:
 		return printJSON(v)
 	}
@@ -92,6 +98,16 @@ func printAddressHuman(a domain.AddressInfo) {
 			}
 
 			fmt.Printf("    %-15s %-12s %-18s %s\n", hash, method, direction, relativeTime(tx.Timestamp))
+		}
+	}
+
+	if len(a.InternalTxs) > 0 {
+		fmt.Println()
+		fmt.Printf("  Internal Transactions (last %d):\n", len(a.InternalTxs))
+		fmt.Printf("    %-15s %-18s %s\n", "Tx Hash", "Value", "Time")
+		fmt.Printf("    %s\n", strings.Repeat("-", 50))
+		for _, tx := range a.InternalTxs {
+			fmt.Printf("    %-15s %-18s %s\n", shortenHash(tx.Hash), tx.Value, relativeTime(tx.Timestamp))
 		}
 	}
 	fmt.Println()
@@ -146,6 +162,77 @@ func printChainInfoHuman(c domain.ChainStatus) {
 	fmt.Printf("  Currency:     %s\n", c.Currency)
 	fmt.Printf("  Latest Block: %d\n", c.LatestBlock)
 	fmt.Printf("  Gas Price:    %s\n", c.GasPrice)
+	fmt.Println()
+}
+
+func printContractHuman(c domain.ContractInfo) {
+	fmt.Println()
+	fmt.Printf("  Contract: %s\n", c.Address)
+	if c.Name != "" {
+		fmt.Printf("  Name:     %s\n", c.Name)
+	}
+	if c.Verified {
+		fmt.Println("  Verified: Yes")
+		fmt.Printf("  Compiler: %s\n", c.Compiler)
+		if c.EVMVersion != "" {
+			fmt.Printf("  EVM:      %s\n", c.EVMVersion)
+		}
+		if c.Optimized {
+			fmt.Printf("  Optimized: Yes (%s runs)\n", c.Runs)
+		} else {
+			fmt.Println("  Optimized: No")
+		}
+		if c.License != "" {
+			fmt.Printf("  License:  %s\n", c.License)
+		}
+	} else {
+		fmt.Println("  Verified: No")
+	}
+	if c.IsProxy {
+		fmt.Printf("  Proxy:    Yes → %s\n", c.Implementation)
+	}
+	if c.Deployer != "" {
+		fmt.Printf("  Deployer: %s\n", c.Deployer)
+	}
+	if c.DeployTx != "" {
+		fmt.Printf("  Deploy Tx: %s\n", shortenHash(c.DeployTx))
+	}
+	fmt.Println()
+}
+
+func printHoldersHuman(h domain.HoldersResult) {
+	fmt.Println()
+	fmt.Printf("  Token Holders (%s total)\n\n", h.TotalCount)
+	if len(h.Holders) == 0 {
+		fmt.Println("  No holders found.")
+	} else {
+		fmt.Printf("  %-4s %-15s %s\n", "#", "Address", "Balance")
+		fmt.Printf("  %s\n", strings.Repeat("-", 50))
+		for i, holder := range h.Holders {
+			fmt.Printf("  %-4d %-15s %s\n", i+1, shortenHash(holder.Address), holder.Balance)
+		}
+	}
+	fmt.Println()
+}
+
+func printLogsHuman(l domain.LogsResult) {
+	fmt.Println()
+	fmt.Printf("  Event Logs (%d found)\n\n", l.Count)
+	if l.Count == 0 {
+		fmt.Println("  No logs found in the specified range.")
+	} else {
+		fmt.Printf("  %-12s %-15s %s\n", "Block", "Tx Hash", "Topics")
+		fmt.Printf("  %s\n", strings.Repeat("-", 70))
+		for _, log := range l.Logs {
+			topic := ""
+			if log.EventName != "" {
+				topic = log.EventName
+			} else if len(log.Topics) > 0 {
+				topic = shortenHash(log.Topics[0])
+			}
+			fmt.Printf("  %-12d %-15s %s\n", log.BlockNumber, shortenHash(log.TxHash), topic)
+		}
+	}
 	fmt.Println()
 }
 

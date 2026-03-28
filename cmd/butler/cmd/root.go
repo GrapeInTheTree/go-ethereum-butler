@@ -114,6 +114,9 @@ func init() {
 	rootCmd.AddCommand(stakingCmd)
 	rootCmd.AddCommand(tokenCmd)
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(contractCmd)
+	rootCmd.AddCommand(holdersCmd)
+	rootCmd.AddCommand(logsCmd)
 }
 
 // Execute runs the root command
