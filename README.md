@@ -340,16 +340,18 @@ cmd/butler/
     tx.go                       butler tx — tx + receipt lookup
     block.go                    butler block — block by number
     chaininfo.go                butler chain-info — chain status
+    call.go                     butler call — generic contract reads (eth_call)
 
 internal/
   domain/
     models.go                   Chain, Token, Wallet, Contact structs
-    output.go                   AddressInfo, TxDetail, BlockInfo, ChainStatus
+    output.go                   AddressInfo, TxDetail, BlockInfo, ChainStatus, CallResult
 
   infra/
     config/config.go            JSON/env config loading + path resolution
     ethereum/
-      client.go                 RPC: balance, nonce, code, blocks, tx, gas
+      client.go                 RPC: balance, nonce, code, blocks, tx, gas, call
+      abi_helper.go             Dynamic ABI encoding/decoding (no abigen needed)
       erc20.go                  ERC-20: balance, transfer, formatting
       abi/erc20.json            Standard ERC-20 ABI
       contracts/erc20.go        Auto-generated Go bindings (abigen)
@@ -379,6 +381,8 @@ internal/
 **Output types in `domain/`** — `AddressInfo`, `TxDetail`, etc. are stable JSON contracts. Placing them in `domain/` keeps them framework-agnostic and reusable across CLI, TUI, and future API layers.
 
 **pow10 uses big.Int** — The original `int64`-based `pow10()` would silently overflow for tokens with >18 decimals. Fixed to use `big.Int.Exp()` which is safe for any decimal count.
+
+**Dynamic ABI via `abi_helper.go`** — `butler call` uses `abi.ParseSelector` + `Arguments.Pack/Unpack` for runtime ABI encoding without JSON files. The same module will be reused by future commands (validators, staking, event logs). `ParseCallSignature` splits cast-style signatures via parenthesis depth counting because `abi.ParseSelector` rejects trailing characters.
 
 </details>
 

@@ -21,6 +21,7 @@ go run ./cmd/butler address 0x1234...
 go run ./cmd/butler tx 0xabcd... --json
 go run ./cmd/butler block latest
 go run ./cmd/butler chain-info --json
+go run ./cmd/butler call 0x1234... "totalSupply()(uint256)"
 
 # Build
 go build -o butler ./cmd/butler
@@ -84,6 +85,9 @@ cmd/butler/
                                     Supports "latest" keyword or specific block number
     chaininfo.go                    `butler chain-info` — chain status
                                     Parallel: block number + gas price
+    call.go                         `butler call <contract> <sig> [args]` — generic eth_call
+                                    Uses abi_helper.go for encoding/decoding
+                                    Supports cast-style sig: "name(inputs)(outputs)"
 
 internal/
   domain/
@@ -106,8 +110,15 @@ internal/
       client.go                     RPC queries (each function creates/closes its own ethclient):
                                     GetBalance, GetNonce, GetCode, GetChainID,
                                     GetGasPrice, GetLatestBlockNumber, GetTransaction,
-                                    GetTransactionReceipt, GetBlock, SendTransaction (EIP-1559),
+                                    GetTransactionReceipt, GetBlock, CallContract,
+                                    SendTransaction (EIP-1559),
                                     FormatBalance, ParseAmount, GetAddressFromPrivateKey
+      abi_helper.go                 Dynamic ABI encoding/decoding without abigen:
+                                    ParseCallSignature — splits "name(in)(out)" via paren depth
+                                    BuildCalldata — ParseSelector + Pack → 4byte selector + args
+                                    ConvertArg — CLI string → Go type (address, uint, bool, etc.)
+                                    DecodeOutputs — Unpack + FormatValue → human strings
+                                    Reusable for validators, staking, logs commands
       erc20.go                      ERC-20: GetTokenBalance, SendTokenTransaction,
                                     FormatTokenBalance, ParseTokenAmount
                                     pow10() uses big.Int (safe for any decimal count)
@@ -154,6 +165,8 @@ internal/
 
 **Type-safe contract bindings:** ERC-20 interactions use `abigen`-generated Go code, not manual ABI encoding.
 
+**Dynamic ABI encoding:** `butler call` uses `abi.ParseSelector` + `abi.Arguments.Pack/Unpack` for runtime encoding without JSON ABI files. The `abi_helper.go` module is designed for reuse by future commands (validators, staking, logs).
+
 **Config-driven extensibility:** Chains, tokens, and contacts are pure JSON. Both TUI and CLI dynamically use these at startup.
 
 **Async blockchain calls:** RPC operations run as concurrent goroutines (CLI uses sync.WaitGroup, TUI uses Bubble Tea commands).
@@ -171,6 +184,7 @@ internal/
 | Block by number | RPC | |
 | **Tx history by address** | **Explorer API** | RPC cannot do this — no `eth_getTransactionsByAddress` exists |
 | **All token holdings** | **Explorer API** | Token discovery requires indexer |
+| **Arbitrary contract reads** | RPC `eth_call` | via `butler call` with dynamic ABI encoding |
 
 ### Config Path Resolution
 
