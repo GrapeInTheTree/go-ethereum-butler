@@ -11,6 +11,10 @@ builds:
     binary: butler
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/GrapeInTheTree/go-ethereum-butler/cmd/butler/cmd.version={{.Version}}
+      - -X github.com/GrapeInTheTree/go-ethereum-butler/cmd/butler/cmd.commit={{.ShortCommit}}
     goos:
       - linux
       - darwin
