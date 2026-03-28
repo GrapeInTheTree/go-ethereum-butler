@@ -256,7 +256,7 @@ git push --tags
 
 **Install methods after release:**
 - `brew tap GrapeInTheTree/tap && brew install chiliz`
-- `go install github.com/GrapeInTheTree/chiliz-cli/cmd/butler@latest`
+- `go install github.com/GrapeInTheTree/chiliz-cli/cmd/chiliz@latest`
 - Download binary from GitHub Releases page
 
 ## Key Dependencies

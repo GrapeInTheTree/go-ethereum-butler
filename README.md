@@ -35,7 +35,7 @@ Think of it as `cast` meets a personal wallet manager.
 ```bash
 # Install (pick one)
 brew tap GrapeInTheTree/tap && brew install chiliz   # Homebrew
-go install github.com/GrapeInTheTree/chiliz-cli/cmd/butler@latest  # Go
+go install github.com/GrapeInTheTree/chiliz-cli/cmd/chiliz@latest  # Go
 
 # Initialize config (Chiliz Mainnet + Spicy Testnet)
 chiliz init
@@ -59,7 +59,7 @@ brew install chiliz
 ### Go Install
 
 ```bash
-go install github.com/GrapeInTheTree/chiliz-cli/cmd/butler@latest
+go install github.com/GrapeInTheTree/chiliz-cli/cmd/chiliz@latest
 ```
 
 ### Download Binary
@@ -490,10 +490,10 @@ Chiliz CLI supports tab completion for bash, zsh, and fish:
 
 ```bash
 # Bash
-chiliz completion bash > /etc/bash_completion.d/butler
+chiliz completion bash > /etc/bash_completion.d/chiliz
 
 # Zsh (add to ~/.zshrc: fpath=(~/.zsh/completions $fpath))
-chiliz completion zsh > ~/.zsh/completions/_butler
+chiliz completion zsh > ~/.zsh/completions/_chiliz
 
 # Fish
 chiliz completion fish > ~/.config/fish/completions/chiliz.fish
