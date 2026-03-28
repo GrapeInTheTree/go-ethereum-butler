@@ -53,6 +53,21 @@ type rawTxListEntry struct {
 	IsError         string `json:"isError"`
 }
 
+// rawTokenInfo maps token metadata from the tokeninfo endpoint
+type rawTokenInfo struct {
+	ContractAddress string `json:"contractAddress"`
+	TokenName       string `json:"tokenName"`
+	Symbol          string `json:"symbol"`
+	TokenType       string `json:"tokenType"`
+	Divisor         string `json:"divisor"`
+	TotalSupply     string `json:"totalSupply"`
+	BlueCheckmark   string `json:"blueCheckmark"`
+	TokenPriceUSD   string `json:"tokenPriceUSD"`
+	Website         string `json:"website"`
+	Twitter         string `json:"twitter"`
+	Telegram        string `json:"telegram"`
+}
+
 // rawTokenBalance maps a single token from the addresstokenbalance endpoint
 type rawTokenBalance struct {
 	TokenAddress string `json:"TokenAddress"`
@@ -169,6 +184,43 @@ func (c *Client) GetTokenTxList(address string, page, offset int) ([]domain.TxSu
 		})
 	}
 	return txs, nil
+}
+
+// GetTokenInfo retrieves token metadata from the tokeninfo endpoint
+func (c *Client) GetTokenInfo(contractAddress string) (*domain.TokenDetail, error) {
+	<-c.rateLimiter
+
+	params := url.Values{
+		"module":          {"token"},
+		"action":          {"tokeninfo"},
+		"contractaddress": {contractAddress},
+	}
+
+	var entries []rawTokenInfo
+	if err := c.fetch(params, &entries); err != nil {
+		return nil, fmt.Errorf("GetTokenInfo: %w", err)
+	}
+
+	if len(entries) == 0 {
+		return nil, fmt.Errorf("token not found: %s", contractAddress)
+	}
+
+	e := entries[0]
+	decimals, _ := strconv.Atoi(e.Divisor)
+
+	return &domain.TokenDetail{
+		ContractAddress: e.ContractAddress,
+		Name:            e.TokenName,
+		Symbol:          e.Symbol,
+		TokenType:       e.TokenType,
+		Decimals:        decimals,
+		TotalSupply:     formatTokenAmount(e.TotalSupply, decimals),
+		Verified:        e.BlueCheckmark == "true",
+		PriceUSD:        e.TokenPriceUSD,
+		Website:         e.Website,
+		Twitter:         e.Twitter,
+		Telegram:        e.Telegram,
+	}, nil
 }
 
 // fetch executes an API call and unmarshals the result into target

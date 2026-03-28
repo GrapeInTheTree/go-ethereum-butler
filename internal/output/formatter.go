@@ -40,6 +40,8 @@ func printHuman(v any) error {
 		printValidatorsHuman(data)
 	case domain.StakingInfo:
 		printStakingHuman(data)
+	case domain.TokenDetail:
+		printTokenHuman(data)
 	default:
 		return printJSON(v)
 	}
@@ -144,6 +146,31 @@ func printChainInfoHuman(c domain.ChainStatus) {
 	fmt.Printf("  Currency:     %s\n", c.Currency)
 	fmt.Printf("  Latest Block: %d\n", c.LatestBlock)
 	fmt.Printf("  Gas Price:    %s\n", c.GasPrice)
+	fmt.Println()
+}
+
+func printTokenHuman(t domain.TokenDetail) {
+	fmt.Println()
+	fmt.Printf("  Token:    %s (%s)\n", t.Name, t.Symbol)
+	fmt.Printf("  Type:     %s\n", t.TokenType)
+	fmt.Printf("  Decimals: %d\n", t.Decimals)
+	fmt.Printf("  Supply:   %s\n", t.TotalSupply)
+	if t.Verified {
+		fmt.Println("  Verified: Yes")
+	}
+	if t.PriceUSD != "" && t.PriceUSD != "0" {
+		fmt.Printf("  Price:    $%s\n", t.PriceUSD)
+	}
+	if t.Website != "" {
+		fmt.Printf("  Website:  %s\n", t.Website)
+	}
+	if t.Twitter != "" {
+		fmt.Printf("  Twitter:  %s\n", t.Twitter)
+	}
+	if t.Telegram != "" {
+		fmt.Printf("  Telegram: %s\n", t.Telegram)
+	}
+	fmt.Printf("  Contract: %s\n", t.ContractAddress)
 	fmt.Println()
 }
 

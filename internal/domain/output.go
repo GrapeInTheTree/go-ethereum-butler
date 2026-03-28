@@ -101,6 +101,21 @@ type ValidatorsResult struct {
 	Validators []ValidatorInfo `json:"validators"`
 }
 
+// TokenDetail is the response for `butler token <address>`
+type TokenDetail struct {
+	ContractAddress string `json:"contract_address"`
+	Name            string `json:"name"`
+	Symbol          string `json:"symbol"`
+	TokenType       string `json:"token_type"`
+	Decimals        int    `json:"decimals"`
+	TotalSupply     string `json:"total_supply"`
+	Verified        bool   `json:"verified"`
+	PriceUSD        string `json:"price_usd,omitempty"`
+	Website         string `json:"website,omitempty"`
+	Twitter         string `json:"twitter,omitempty"`
+	Telegram        string `json:"telegram,omitempty"`
+}
+
 // StakingEntry represents staking for a single validator
 type StakingEntry struct {
 	Validator  string `json:"validator"`
