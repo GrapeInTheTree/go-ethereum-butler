@@ -89,6 +89,7 @@ func init() {
 	rootCmd.AddCommand(callCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(validatorsCmd)
+	rootCmd.AddCommand(rpcCmd)
 }
 
 // Execute runs the root command
