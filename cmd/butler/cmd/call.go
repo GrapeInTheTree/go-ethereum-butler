@@ -3,9 +3,9 @@ package cmd
 import (
 	"encoding/hex"
 	"fmt"
-	"strings"
 
 	"github.com/GrapeInTheTree/go-ethereum-butler/internal/domain"
+	"github.com/GrapeInTheTree/go-ethereum-butler/internal/infra/config"
 	"github.com/GrapeInTheTree/go-ethereum-butler/internal/infra/ethereum"
 	"github.com/GrapeInTheTree/go-ethereum-butler/internal/output"
 	"github.com/spf13/cobra"
@@ -26,13 +26,12 @@ Examples:
   butler call 0x60F3...6b67 "totalSupply()"              # raw hex output`,
 	Args: cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		contractAddr := args[0]
+		contractAddr, err := config.ResolveAddress(args[0], appCtx.Contacts)
+		if err != nil {
+			return err
+		}
 		sig := args[1]
 		callArgs := args[2:]
-
-		if !strings.HasPrefix(contractAddr, "0x") || len(contractAddr) != 42 {
-			return fmt.Errorf("invalid contract address: must be 0x + 40 hex chars")
-		}
 
 		// Parse signature into input and output parts
 		inputSig, outputTypes, err := ethereum.ParseCallSignature(sig)

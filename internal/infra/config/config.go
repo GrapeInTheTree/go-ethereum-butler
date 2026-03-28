@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/GrapeInTheTree/go-ethereum-butler/internal/domain"
 	"github.com/joho/godotenv"
@@ -135,6 +136,28 @@ func GetTokensForChain(tokens []domain.Token, chainID int64) []domain.Token {
 		}
 	}
 	return result
+}
+
+// ResolveAddress resolves a contact name or validates an Ethereum address.
+// If input starts with "0x", it validates as an address (42 chars).
+// Otherwise, it searches contacts by name (case-insensitive partial match).
+func ResolveAddress(input string, contacts []domain.Contact) (string, error) {
+	if strings.HasPrefix(input, "0x") || strings.HasPrefix(input, "0X") {
+		if len(input) != 42 {
+			return "", fmt.Errorf("invalid address: must be 0x + 40 hex chars")
+		}
+		return input, nil
+	}
+
+	// Search contacts by name (case-insensitive, partial match)
+	inputLower := strings.ToLower(input)
+	for _, c := range contacts {
+		if strings.Contains(strings.ToLower(c.Name), inputLower) {
+			return c.Address, nil
+		}
+	}
+
+	return "", fmt.Errorf("address or contact %q not found\nHint: use a 0x address or a name from contacts.json", input)
 }
 
 // GetPrivateKey safely retrieves a private key from environment

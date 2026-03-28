@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 
 	"github.com/GrapeInTheTree/go-ethereum-butler/internal/domain"
+	"github.com/GrapeInTheTree/go-ethereum-butler/internal/infra/config"
 	"github.com/GrapeInTheTree/go-ethereum-butler/internal/infra/ethereum"
 	"github.com/GrapeInTheTree/go-ethereum-butler/internal/output"
 	"github.com/spf13/cobra"
@@ -17,9 +17,9 @@ var addressCmd = &cobra.Command{
 	Long:  "Display balance, nonce, token holdings, and recent transactions for an address",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		addr := args[0]
-		if !strings.HasPrefix(addr, "0x") || len(addr) != 42 {
-			return fmt.Errorf("invalid address format: must be 0x + 40 hex chars")
+		addr, err := config.ResolveAddress(args[0], appCtx.Contacts)
+		if err != nil {
+			return err
 		}
 
 		chain := appCtx.Chain

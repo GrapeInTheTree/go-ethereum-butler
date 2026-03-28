@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
+	"github.com/GrapeInTheTree/go-ethereum-butler/internal/infra/config"
 	"github.com/GrapeInTheTree/go-ethereum-butler/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -18,9 +18,9 @@ Examples:
   butler token 0x60F397acBCfB8f4e3234C659A3E10867e6fA6b67 --json`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		addr := args[0]
-		if !strings.HasPrefix(addr, "0x") || len(addr) != 42 {
-			return fmt.Errorf("invalid contract address: must be 0x + 40 hex chars")
+		addr, err := config.ResolveAddress(args[0], appCtx.Contacts)
+		if err != nil {
+			return err
 		}
 
 		if appCtx.Explorer == nil {
