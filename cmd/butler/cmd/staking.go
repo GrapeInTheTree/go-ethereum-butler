@@ -57,10 +57,13 @@ var stakingCmd = &cobra.Command{
 		results := make([]stakingResult, len(validators))
 		var wg sync.WaitGroup
 		var mu sync.Mutex
+		sem := make(chan struct{}, 4)
 
 		for i, v := range validators {
 			wg.Add(1)
 			go func(idx int, validatorAddr string) {
+				sem <- struct{}{}
+				defer func() { <-sem }()
 				defer wg.Done()
 
 				staked := queryStakingPool(rpc, "getStakedAmount(address,address)", validatorAddr, addr)

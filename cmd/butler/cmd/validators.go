@@ -44,25 +44,27 @@ var validatorsCmd = &cobra.Command{
 			return fmt.Errorf("no validators found")
 		}
 
-		// 2. Get status for each validator in parallel
+		// 2. Get status for each validator (max 4 concurrent to avoid RPC rate limits)
 		validators := make([]domain.ValidatorInfo, len(addresses))
 		var wg sync.WaitGroup
 		var mu sync.Mutex
-		var firstErr error
+		sem := make(chan struct{}, 4)
 
 		for i, addr := range addresses {
 			wg.Add(1)
 			go func(idx int, validatorAddr string) {
+				sem <- struct{}{}
+				defer func() { <-sem }()
 				defer wg.Done()
 
 				info, err := fetchValidatorStatus(rpc, validatorAddr)
+				if err != nil {
+					// Retry once on failure (RPC transient errors)
+					info, err = fetchValidatorStatus(rpc, validatorAddr)
+				}
 				mu.Lock()
 				defer mu.Unlock()
 				if err != nil {
-					if firstErr == nil {
-						firstErr = fmt.Errorf("validator %s: %w", validatorAddr, err)
-					}
-					// Still fill basic info
 					validators[idx] = domain.ValidatorInfo{
 						Address: validatorAddr,
 						Status:  "unknown",
